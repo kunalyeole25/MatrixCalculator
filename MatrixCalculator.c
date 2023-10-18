@@ -1,5 +1,6 @@
-#include<stdio.h>
-#include<math.h>
+#include <stdio.h>
+#include <math.h>
+
 int main()
 {
 	int r1, c1, i, j;

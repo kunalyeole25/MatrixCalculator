@@ -4,11 +4,27 @@ This is a simple C program that allows you to perform various matrix operations,
 
 ## Getting Started
 
-To use this program, you need to have a C compiler installed on your system.
+You can either run a prebuilt release binary (no compiler needed) or compile locally.
 
 1. Clone or download this repository.
-2. Compile the C program using your preferred C compiler.
-3. Run the compiled program in your terminal or command prompt.
+2. Choose one option:
+   - **Download prebuilt binary:** go to **Releases** and download the file for your OS/architecture:
+     - `MatrixCalculator-windows-<arch>.exe`
+     - `MatrixCalculator-linux-<arch>`
+     - `MatrixCalculator-macos-<arch>`
+   - **Build locally:** compile with your preferred C compiler.
+3. Run the binary in your terminal or command prompt.
+
+### Local build
+
+```bash
+gcc -std=c11 -O2 -DNDEBUG -Wall -Wextra -pedantic MatrixCalculator.c -lm -o MatrixCalculator
+```
+
+### Release automation
+
+GitHub Actions builds binaries for Windows, Linux, and macOS.  
+When a tag like `v1.0.0` is pushed (or a workflow is manually triggered), the workflow publishes those binaries as GitHub Release assets.
 
 ## Usage
 

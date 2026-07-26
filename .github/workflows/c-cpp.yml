@@ -1,23 +1,98 @@
-name: C/C++ CI
+name: Build and Release
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
+    tags: ["v*"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (example: v1.0.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
 
 jobs:
   build:
-
-    runs-on: ubuntu-latest
+    name: Build (${{ matrix.target_os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target_os: linux
+            binary_ext: ""
+          - os: macos-latest
+            target_os: macos
+            binary_ext: ""
+          - os: windows-latest
+            target_os: windows
+            binary_ext: ".exe"
 
     steps:
-    - uses: actions/checkout@v4
-    - name: configure
-      run: ./configure
-    - name: make
-      run: make
-    - name: make check
-      run: make check
-    - name: make distcheck
-      run: make distcheck
+      - uses: actions/checkout@v4
+
+      - name: Install GCC (Windows)
+        if: matrix.target_os == 'windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: mingw-w64-x86_64-gcc
+
+      - name: Build binary (Linux/macOS)
+        if: matrix.target_os != 'windows'
+        run: |
+          mkdir -p dist
+          output="MatrixCalculator-${{ matrix.target_os }}-${{ runner.arch }}${{ matrix.binary_ext }}"
+          gcc -std=c11 -O2 -DNDEBUG -Wall -Wextra -pedantic MatrixCalculator.c -lm -o "dist/${output}"
+
+      - name: Build binary (Windows)
+        if: matrix.target_os == 'windows'
+        shell: msys2 {0}
+        run: |
+          mkdir -p dist
+          output="MatrixCalculator-${{ matrix.target_os }}-${{ runner.arch }}${{ matrix.binary_ext }}"
+          gcc -std=c11 -O2 -DNDEBUG -Wall -Wextra -pedantic MatrixCalculator.c -lm -o "dist/${output}"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MatrixCalculator-${{ matrix.target_os }}-${{ runner.arch }}
+          path: dist/MatrixCalculator-${{ matrix.target_os }}-${{ runner.arch }}${{ matrix.binary_ext }}
+          if-no-files-found: error
+
+  release:
+    name: Publish release assets
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create or update GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.value }}
+          generate_release_notes: true
+          overwrite_files: true
+          files: release-assets/*
